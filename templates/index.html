@@ -6,6 +6,8 @@
     <title>🛡️ Phishing URL Detector</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/detection.css">
     <style>
         * {
             margin: 0;
@@ -106,11 +108,11 @@
         }
         
         .card {
+            background: rgba(30, 41, 59, 0.4);
             -webkit-backdrop-filter: blur(20px);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 20px;
-            padding: 3rem;
             padding: 3rem;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05);
             position: relative;
@@ -279,12 +281,6 @@
             border-bottom: none;
         }
         
-        .reasons-items {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        
         .reasons-list li:nth-child(1) {
             animation-delay: 0.1s;
         }
@@ -305,12 +301,6 @@
             animation-delay: 0.5s;
         }
         
-        .reasons-title {
-            display: block;
-            margin-bottom: 1rem;
-            color: #f1f5f9;
-        }
-        
         @keyframes reasonFadeIn {
             from {
                 opacity: 0;
@@ -326,18 +316,28 @@
             text-align: center;
             padding: 2rem 0;
             font-size: 0.9rem;
+            color: #64748b;
+            background: rgba(15, 23, 42, 0.3);
             -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            margin-top: 4rem;
             border-top: 1px solid rgba(255, 255, 255, 0.05);
             margin-top: 4rem;
         }
         
         .footer-content {
-            max-width: 900px;
             margin: 0 auto;
             padding: 0 1rem;
+        }
+        
+        .footer-link {
+            color: #6366f1;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .footer-link:hover {
+            color: #8b5cf6;
+            text-decoration: underline;
         }
         /* Responsive design */
         
@@ -386,11 +386,6 @@
                 transform: rotate(360deg);
             }
         }
-        
-        .footer-link {
-            color: #6366f1;
-            text-decoration: none;
-        }
     </style>
 </head>
 
@@ -415,17 +410,17 @@
                 </button>
             </form>
 
-            {% if reasons %}
-            <div class="reasons-list">
-                <strong class="reasons-title">Detection Reasons:</strong>
-                <ul class="reasons-items">
-                    <li>{{ reasons|join('</li>
-                    <li>')|safe }}</li>
-                </ul>
+            {% if prediction %}
+            <div class="result {{ 'phish' if 'Unsafe' in prediction else 'safe' }}">
+                {{ prediction }} {% if reasons and reasons|length > 0 %}
+                <strong class="detection-reasons-title">Detection Reasons:</strong>
+                <ul class="reasons-list" id="reasonsList" data-reasons='{{ reasons|tojson|safe }}'></ul>
+                {% endif %}
             </div>
             {% endif %}
         </div>
     </main>
+
     <footer>
         <div class="footer-content">
             Built by <strong>Rupam Kumari</strong> |
@@ -455,6 +450,22 @@
                 }, 100);
             }
         });
+
+        // Populate reasons list (avoids template directives as direct UL children)
+        (function() {
+            const ul = document.getElementById('reasonsList');
+            if (!ul) return;
+            try {
+                const data = JSON.parse(ul.getAttribute('data-reasons') || '[]');
+                data.forEach(function(r) {
+                    const li = document.createElement('li');
+                    li.textContent = r;
+                    ul.appendChild(li);
+                });
+            } catch (e) {
+                // fail silently
+            }
+        })();
     </script>
 </body>
 
