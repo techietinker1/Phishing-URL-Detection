@@ -28,81 +28,97 @@ def load_model():
     return model
 
 def extract_features(url: str, feature_columns):
-    """Build feature dict for required columns. For columns we cannot compute
-    directly from the URL string (HTML/content-based), fill with 0 as neutral placeholder.
-    This keeps alignment with training feature order; real production would require
-    full page fetch & parse to populate many of these attributes.
-    """
-    base = url.lower()
-    feat = {}
-    # Basic URL-derived metrics
+    """Extract features that can be computed directly from URL string only."""
+    url_lower = url.lower()
+    
+    # Basic length and character counts
     url_length = len(url)
     count_dot = url.count('.')
     count_at = url.count('@')
     count_hyphen = url.count('-')
+    count_underscore = url.count('_')
+    count_slash = url.count('/')
+    count_question = url.count('?')
+    count_equal = url.count('=')
+    count_ampersand = url.count('&')
+    
+    # Digit analysis
     digit_count = sum(c.isdigit() for c in url)
-    special_core = sum(url.count(c) for c in ['@','?','=','%','&'])
-    # Map simple ones
-    simple_map = {
-        'URLLength': url_length,
-        'DomainLength': 0,  # unknown without full parse
-        'IsDomainIP': 1 if re.match(r'^https?://(?:\d{1,3}\.){3}\d{1,3}', base) else 0,
-        'URLSimilarityIndex': 0.0,
-        'CharContinuationRate': 0.0,
-        'TLDLegitimateProb': 0.5,
-        'URLCharProb': 0.0,
-        'TLDLength': 0,
-        'NoOfSubDomain': max(0, count_dot - 1),
-        'HasObfuscation': 1 if '@' in url else 0,
-        'NoOfObfuscatedChar': count_at,
-        'ObfuscationRatio': (count_at / url_length) if url_length else 0,
-        'NoOfLettersInURL': url_length - digit_count,
-        'LetterRatioInURL': (url_length - digit_count) / url_length if url_length else 0,
-        'NoOfDegitsInURL': digit_count,
-        'DegitRatioInURL': digit_count / url_length if url_length else 0,
-        'NoOfEqualsInURL': url.count('='),
-        'NoOfQMarkInURL': url.count('?'),
-        'NoOfAmpersandInURL': url.count('&'),
-        'NoOfOtherSpecialCharsInURL': special_core,
-        'SpacialCharRatioInURL': special_core / url_length if url_length else 0,
-        'IsHTTPS': 1 if url.lower().startswith('https://') else 0,
-        'LineOfCode': 0,
-        'LargestLineLength': 0,
-        'HasTitle': 0,
-        'DomainTitleMatchScore': 0.0,
-        'URLTitleMatchScore': 0.0,
-        'HasFavicon': 0,
-        'Robots': 0,
-        'IsResponsive': 1,  # optimistic default
-        'NoOfURLRedirect': 0,
-        'NoOfSelfRedirect': 0,
-        'HasDescription': 0,
-        'NoOfPopup': 0,
-        'NoOfiFrame': 0,
-        'HasExternalFormSubmit': 0,
-        'HasSocialNet': 0,
-        'HasSubmitButton': 0,
-        'HasHiddenFields': 0,
-        'HasPasswordField': 1 if 'login' in base or 'password' in base else 0,
-        'Bank': 1 if any(k in base for k in ['bank','secure']) else 0,
-        'Pay': 1 if any(k in base for k in ['pay','payment']) else 0,
-        'Crypto': 1 if any(k in base for k in ['crypto','btc','eth']) else 0,
-        'HasCopyrightInfo': 0,
-        'NoOfImage': 0,
-        'NoOfCSS': 0,
-        'NoOfJS': 0,
-        'NoOfSelfRef': 0,
-        'NoOfEmptyRef': 0,
-        'NoOfExternalRef': 0,
-        # Legacy simple features (for backwards compatibility if needed)
+    digit_ratio = digit_count / len(url) if len(url) > 0 else 0
+    
+    # Letter analysis
+    letter_count = sum(c.isalpha() for c in url)
+    letter_ratio = letter_count / len(url) if len(url) > 0 else 0
+    
+    # Special character analysis
+    special_chars = '@?=&%#'
+    special_count = sum(url.count(c) for c in special_chars)
+    special_ratio = special_count / len(url) if len(url) > 0 else 0
+    
+    # Protocol analysis
+    is_https = 1 if url_lower.startswith('https://') else 0
+    is_http = 1 if url_lower.startswith('http://') else 0
+    
+    # Domain analysis
+    domain_match = re.search(r'https?://([^/]+)', url_lower)
+    if domain_match:
+        domain = domain_match.group(1)
+        domain_length = len(domain)
+        subdomain_count = domain.count('.') - 1 if domain.count('.') > 0 else 0
+        # Check if domain is IP address
+        is_ip = 1 if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', domain) else 0
+    else:
+        domain_length = 0
+        subdomain_count = 0
+        is_ip = 0
+    
+    # Suspicious keywords (common in phishing)
+    suspicious_keywords = [
+        'login', 'signin', 'account', 'verify', 'confirm', 'update', 'secure',
+        'bank', 'paypal', 'amazon', 'microsoft', 'apple', 'google', 'facebook',
+        'security', 'suspended', 'limited', 'expire', 'urgent'
+    ]
+    keyword_count = sum(1 for keyword in suspicious_keywords if keyword in url_lower)
+    
+    # Suspicious TLDs
+    suspicious_tlds = ['.tk', '.ml', '.ga', '.cf', '.ru', '.cn']
+    has_suspicious_tld = 1 if any(tld in url_lower for tld in suspicious_tlds) else 0
+    
+    # URL path analysis
+    path_depth = url.count('/') - 2 if url.startswith('http') else url.count('/')
+    path_depth = max(0, path_depth)
+    
+    feature_map = {
         'url_length': url_length,
         'count_dot': count_dot,
         'count_at': count_at,
         'count_hyphen': count_hyphen,
+        'count_underscore': count_underscore,
+        'count_slash': count_slash,
+        'count_question': count_question,
+        'count_equal': count_equal,
+        'count_ampersand': count_ampersand,
+        'digit_count': digit_count,
+        'digit_ratio': digit_ratio,
+        'letter_count': letter_count,
+        'letter_ratio': letter_ratio,
+        'special_count': special_count,
+        'special_ratio': special_ratio,
+        'is_https': is_https,
+        'is_http': is_http,
+        'domain_length': domain_length,
+        'subdomain_count': subdomain_count,
+        'is_ip': is_ip,
+        'keyword_count': keyword_count,
+        'has_suspicious_tld': has_suspicious_tld,
+        'path_depth': path_depth
     }
+    
+    # Return only the features that the model expects
+    result = {}
     for col in feature_columns:
-        feat[col] = simple_map.get(col, 0)
-    return feat
+        result[col] = feature_map.get(col, 0)
+    return result
 
 # --- Heuristic / rule-based risk analysis (simple illustrative) ---
 RISK_TLDS = {"zip","mov","country","click","link","work","fit","tokyo","rest"}
