@@ -45,6 +45,7 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+PhiUSIIL_Phishing_URL_Dataset.csv
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -80,3 +81,17 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Model and artifacts (don't commit large pickled models / heavy artifacts)
+*.pkl
+models/
+
+# Dataset folder
+data/
+
+# Large notebooks and checkpoints
+*.ipynb
+.ipynb_checkpoints/
+
+# Logs
+*.log
